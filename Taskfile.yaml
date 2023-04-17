@@ -1,0 +1,50 @@
+version: "3"
+
+tasks:
+  run:
+    deps: [build]
+    desc: "Exports JQL results from Jira"
+    cmds:
+      - ./dist/jira-export
+
+  build:
+    desc: "Build the project"
+    cmds:
+      - |
+        CGO_ENABLED=0 go build \
+          -a \
+          -tags netgo \
+          -ldflags '-w -extldflags "-static"' \
+          -o dist/jira-export .
+      - chmod +x dist/jira-export
+    generates:
+      - dist/jira-export
+
+  clean:
+    desc: "Clean up"
+    cmds:
+      - rm -rf dist
+      - rm -rf cache
+
+  decrypt:
+    desc: "Decrypt secrets"
+    cmds:
+      - sops -d enc.env > .env
+
+  update:
+    desc: "Update dependencies"
+    cmds:
+      - go get -u ./...
+      - go mod tidy
+
+  docker::build:
+    desc: "Build the docker image"
+    cmds:
+      - docker build -t jira-export .
+
+  docker::run:
+    deps:
+      - docker::build
+    desc: "Run the docker image"
+    cmds:
+      - docker run -it --rm --env-file .env jira-export
