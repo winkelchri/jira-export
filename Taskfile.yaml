@@ -17,6 +17,8 @@ tasks:
           -ldflags '-w -extldflags "-static"' \
           -o dist/jira-export .
       - chmod +x dist/jira-export
+    sources:
+      - "**/*.go"
     generates:
       - dist/jira-export
 
