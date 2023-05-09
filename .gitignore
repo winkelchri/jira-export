@@ -104,3 +104,4 @@ dist/**/*
 cache/
 .venv/
 .env
+.task
