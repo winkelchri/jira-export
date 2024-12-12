@@ -7,12 +7,13 @@ import (
 
 // JiraSearchResults
 type JiraSearchResults struct {
-	RequestURL string        `json:"requestURL"`
-	Expand     string        `json:"expand"`
-	StartAt    int           `json:"startAt"`
-	MaxResults int           `json:"maxResults"`
-	Total      int           `json:"total"`
-	Issues     []interface{} `json:"issues"`
+	RequestURL    string        `json:"requestURL"`
+	Expand        string        `json:"expand"`
+	StartAt       int           `json:"startAt"`
+	MaxResults    int           `json:"maxResults"`
+	Total         int           `json:"total"`
+	Issues        []interface{} `json:"issues"`
+	ErrorMessages *[]string     `json:"errorMessages,omitempty"`
 }
 
 func (j *JiraSearchResults) IssuesToJiraIssues() (issues Issues, err error) {

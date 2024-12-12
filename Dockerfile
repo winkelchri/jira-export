@@ -1,7 +1,7 @@
 # USE GO 1.20 to build this image
 # docker build -t golang:1.20 .
 
-FROM golang:1.20
+FROM golang:1.23.4
 
 # Install go-taskfile
 RUN curl -sL https://taskfile.dev/install.sh | sh

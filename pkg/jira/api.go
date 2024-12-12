@@ -94,6 +94,12 @@ func (j JiraAPI) GetFilterResults(jql string) (results JiraSearchResults, err er
 		return results, HandleJSONDecodeError(err, resp)
 	}
 
+	// Check for errors in the response
+	// The response may include an "errorMessages" field in case of a wrong search query
+	if results.ErrorMessages != nil {
+		return results, fmt.Errorf("error in response: %v", results.ErrorMessages)
+	}
+
 	// Fetch additional pages of results if necessary
 	if results.Total > results.MaxResults {
 		additionalData, err := j.fetchAdditionalResults(req, config, results.MaxResults, results.Total)
@@ -109,7 +115,7 @@ func (j JiraAPI) GetFilterResults(jql string) (results JiraSearchResults, err er
 // sendRequestWithBackoff sends an HTTP request with incremental backoff using the CachedRequest function
 func sendRequestWithBackoff(req *http.Request, config *rutil.CacheConfig) (*http.Response, error) {
 	backoff := time.Second
-	cr := rutil.CachedRequest{req}
+	cr := rutil.NewCachedRequest(req)
 	for {
 		resp, err := cr.Cache(config)
 		if err != nil {
@@ -134,17 +140,23 @@ func sendRequestWithBackoff(req *http.Request, config *rutil.CacheConfig) (*http
 	}
 }
 
-func responseIsTooManyRequests(reader *bytes.Reader) bool {
+func responseIsTooManyRequests(r io.Reader) bool {
+	// Create a new *bytes.Reader using the io.Reader
+	reader := io.LimitReader(r, 100)
+
 	// Read the first 100 bytes of the response body
-	data, err := io.ReadAll(io.LimitReader(reader, 100))
-	if err != nil {
+	first100Bytes := make([]byte, 100)
+	_, err := reader.Read(first100Bytes)
+	if err != nil && err != io.EOF {
+		fmt.Println("error reading response body in responseIsTooManyRequests:", err)
 		return false
 	}
 
 	// Check if the response body starts with "<!DOCTYPE html>"
 	// if true, then the response is an HTML page and not JSON
 	// and the request was rate limited
-	return string(data) == "<!DOCTYPE html>"
+	// fmt.Println("responseIsTooManyRequests:", strings.HasPrefix(string(first100Bytes), "<!DOCTYPE html>"))
+	return strings.HasPrefix(string(first100Bytes), "<!DOCTYPE html>")
 }
 
 // fetchAdditionalResults fetches additional pages of Jira search results
@@ -168,12 +180,14 @@ func (j JiraAPI) fetchAdditionalResults(req *http.Request, config *rutil.CacheCo
 		for _, r := range rs[i:end] {
 			go func(r *http.Request) {
 
-				cr := rutil.CachedRequest{r}
+				cr := rutil.NewCachedRequest(r)
 
 				backoff := 1.0
 
 				// Send the request with incremental backoff
 				for {
+
+					// Send the request with incremental backoff using the CachedRequest function
 					resp, err := cr.Cache(config)
 					if err != nil {
 						fmt.Println("Error sending request:", err)
@@ -181,6 +195,7 @@ func (j JiraAPI) fetchAdditionalResults(req *http.Request, config *rutil.CacheCo
 						return
 					}
 
+					// CHeck if the responseBody can be read
 					respBodyBytes, err := io.ReadAll(resp.Body)
 					if err != nil {
 						fmt.Println("Error reading response body:", err)
@@ -189,20 +204,26 @@ func (j JiraAPI) fetchAdditionalResults(req *http.Request, config *rutil.CacheCo
 					}
 
 					// Check if the response is a rate limit error
-					r1 := bytes.NewReader(respBodyBytes)
+					r := bytes.NewReader(respBodyBytes)
 					r2 := bytes.NewReader(respBodyBytes)
 
-					if responseIsTooManyRequests(r1) {
+					if responseIsTooManyRequests(r) {
 						sleepTime := time.Duration(float64(rand.Intn(500)+500) * backoff)
 						time.Sleep(sleepTime * time.Millisecond)
+						fmt.Println("Rate limit error. Sleeping for", sleepTime, "ms")
+						// Clear cache file
+						cr.ClearCacheFile(config)
+
 						backoff *= 2
 						continue
 					}
 
 					var data JiraSearchResults
 
+					// Decode the response body
 					if err := json.NewDecoder(r2).Decode(&data); err != nil {
-						fmt.Println("Error decoding JSON:", err)
+						// fmt.Println("Response body:", string(respBodyBytes))
+						fmt.Println("Error parsing JSON from Cache file ", cr.GetCacheFile(config), ":", err)
 						results <- nil
 						return
 					}
@@ -218,7 +239,7 @@ func (j JiraAPI) fetchAdditionalResults(req *http.Request, config *rutil.CacheCo
 		for j := 0; j < end-i; j++ {
 			r := <-results
 			if r == nil {
-				return nil, fmt.Errorf("parallel send failed with error")
+				return nil, fmt.Errorf("parallel send failed with error %v", r)
 			}
 			additionalData = append(additionalData, r...)
 		}
