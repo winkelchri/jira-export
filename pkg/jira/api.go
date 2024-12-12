@@ -89,6 +89,11 @@ func (j JiraAPI) GetFilterResults(jql string) (results JiraSearchResults, err er
 	}
 	defer resp.Body.Close()
 
+	// Check for authentication error
+	if resp.StatusCode == http.StatusUnauthorized {
+		return results, fmt.Errorf("authentication failed: received 401 Unauthorized")
+	}
+
 	// Decode the response body
 	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
 		return results, HandleJSONDecodeError(err, resp)
@@ -126,6 +131,12 @@ func sendRequestWithBackoff(req *http.Request, config *rutil.CacheConfig) (*http
 			}
 			continue
 		}
+
+		// Check for authentication error
+		if resp.StatusCode == http.StatusUnauthorized {
+			return nil, fmt.Errorf("authentication failed: received 401 Unauthorized")
+		}
+
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
 			time.Sleep(backoff)
@@ -195,6 +206,12 @@ func (j JiraAPI) fetchAdditionalResults(req *http.Request, config *rutil.CacheCo
 						return
 					}
 
+					// Check for authentication error
+					if resp.StatusCode == http.StatusUnauthorized {
+						results <- nil
+						return
+					}
+
 					// CHeck if the responseBody can be read
 					respBodyBytes, err := io.ReadAll(resp.Body)
 					if err != nil {
@@ -254,15 +271,12 @@ func buildSearchRequest(url string, secrets secrets.Secrets, jql string, maxResu
 		return nil, fmt.Errorf("error preparing GET request: %v", err)
 	}
 
-	// // Remove tailing and leading single quotes
-	jql = strings.Trim(jql, "'")
-	// // Remove tailing and leading double quotes
-	jql = strings.Trim(jql, "\"")
 	fmt.Println("JQL:", jql)
 
 	q := req.URL.Query()
 	q.Set("jql", jql)
 	q.Set("maxResults", strconv.Itoa(maxResults))
+	// Properly encode the query parameters
 	req.URL.RawQuery = q.Encode()
 
 	return req, nil

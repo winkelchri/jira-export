@@ -10,6 +10,7 @@ import (
 	"jira-export/pkg/secrets"
 	t "jira-export/pkg/terminal"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
@@ -47,6 +48,8 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(&token, "token", "t", viper.GetString("token"), "Jira token")
 	RootCmd.PersistentFlags().StringVarP(&url, "url", "r", viper.GetString("url"), "Jira URL")
 	RootCmd.PersistentFlags().StringVarP(&jql, "jql", "j", viper.GetString("jql"), "JQL query")
+	// Trim surrounding single quotes if present
+	jql = strings.Trim(jql, "'")
 	RootCmd.PersistentFlags().StringVarP(&outputDir, "output", "o", "dist/jira/results", "Output directory")
 	RootCmd.PersistentFlags().IntVarP(&maxResults, "max-results", "m", 100, "Max results")
 }
