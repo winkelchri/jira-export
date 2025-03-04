@@ -2,6 +2,7 @@ package jira
 
 import (
 	"fmt"
+	"jira-export/pkg/logger"
 	"time"
 )
 
@@ -31,7 +32,8 @@ func (j *JiraSearchResults) IssuesToJiraIssues() (issues Issues, err error) {
 		// Add the JiraIssue object to the issues slice
 		issues = append(issues, i)
 	}
-	fmt.Println("Time to convert issues to JiraIssue objects took:", time.Since(now))
+
+	logger.Logger.Debug("Processing time for converting issues to JiraIssues", "processing_time", time.Since(now))
 
 	return issues, nil
 }

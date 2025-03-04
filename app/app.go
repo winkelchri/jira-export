@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 	"jira-export/pkg/jira"
+	"jira-export/pkg/logger"
 	"jira-export/pkg/output"
 	"jira-export/pkg/secrets"
-	t "jira-export/pkg/terminal"
 	"os"
 	"strings"
 
@@ -33,7 +33,7 @@ const (
 func init() {
 	err := godotenv.Load()
 	if err != nil {
-		fmt.Println("Error loading .env file")
+		logger.Logger.Error("Error loading .env file", "error", err)
 	}
 
 	// Bind environment variables
@@ -60,22 +60,22 @@ var RootCmd = &cobra.Command{
 	Long:  `Export Jira issues to CSV and JSON`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if username == "" {
-			fmt.Printf("%sError%s: Missing username\n", t.Red, t.Reset)
+			logger.Logger.Error("Missing username")
 			os.Exit(1)
 		}
 
 		if token == "" {
-			fmt.Printf("%sError%s: Missing token\n", t.Red, t.Reset)
+			logger.Logger.Error("Missing token")
 			os.Exit(1)
 		}
 
 		if url == "" {
-			fmt.Printf("%sError%s: Missing URL\n", t.Red, t.Reset)
+			logger.Logger.Error("Missing URL")
 			os.Exit(1)
 		}
 
 		if jql == "" {
-			fmt.Printf("%sError%s: Missing JQL query\n", t.Red, t.Reset)
+			logger.Logger.Error("Missing JQL query")
 			os.Exit(1)
 		}
 
@@ -87,7 +87,7 @@ var RootCmd = &cobra.Command{
 
 		err := Export(jql, outputDir, secrets, maxResults)
 		if err != nil {
-			fmt.Printf("%sError: %s%s", t.Red, err, t.Reset)
+			logger.Logger.Error("Export failed", "error", err)
 		}
 
 	},
@@ -100,7 +100,7 @@ func Export(jqlQuery string, outputDir string, secrets secrets.Secrets, maxResul
 	data := jira.JiraSearchResults{}
 	outputFileName := "jira-export"
 
-	fmt.Printf("%s%s%s\n", t.Underline, jqlQuery, t.Reset)
+	logger.Logger.Debug("Exporting Jira issues", "jql", jqlQuery)
 
 	data, err := jiraAPI.GetFilterResults(jqlQuery)
 	if err != nil {
@@ -112,7 +112,7 @@ func Export(jqlQuery string, outputDir string, secrets secrets.Secrets, maxResul
 		return fmt.Errorf("error converting issues: %v", err)
 	}
 
-	fmt.Println("Issues: ", len(issues))
+	logger.Logger.Info("Exported Jira issues", "count", len(issues))
 
 	// Write the issues to a JSON file
 	jsonData, err := json.Marshal(issues)

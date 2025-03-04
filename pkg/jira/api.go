@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"jira-export/pkg/logger"
 	rutil "jira-export/pkg/request_util"
 	"jira-export/pkg/secrets"
 	"math/rand"
@@ -159,14 +160,13 @@ func responseIsTooManyRequests(r io.Reader) bool {
 	first100Bytes := make([]byte, 100)
 	_, err := reader.Read(first100Bytes)
 	if err != nil && err != io.EOF {
-		fmt.Println("error reading response body in responseIsTooManyRequests:", err)
+		logger.Logger.Error("error reading response body in responseIsTooManyRequests", "error", err)
 		return false
 	}
 
 	// Check if the response body starts with "<!DOCTYPE html>"
 	// if true, then the response is an HTML page and not JSON
 	// and the request was rate limited
-	// fmt.Println("responseIsTooManyRequests:", strings.HasPrefix(string(first100Bytes), "<!DOCTYPE html>"))
 	return strings.HasPrefix(string(first100Bytes), "<!DOCTYPE html>")
 }
 
@@ -201,7 +201,7 @@ func (j JiraAPI) fetchAdditionalResults(req *http.Request, config *rutil.CacheCo
 					// Send the request with incremental backoff using the CachedRequest function
 					resp, err := cr.Cache(config)
 					if err != nil {
-						fmt.Println("Error sending request:", err)
+						logger.Logger.Error("Error sending request", "error", err)
 						results <- nil
 						return
 					}
@@ -215,7 +215,7 @@ func (j JiraAPI) fetchAdditionalResults(req *http.Request, config *rutil.CacheCo
 					// CHeck if the responseBody can be read
 					respBodyBytes, err := io.ReadAll(resp.Body)
 					if err != nil {
-						fmt.Println("Error reading response body:", err)
+						logger.Logger.Error("Error reading response body:", err)
 						results <- nil
 						return
 					}
@@ -227,7 +227,7 @@ func (j JiraAPI) fetchAdditionalResults(req *http.Request, config *rutil.CacheCo
 					if responseIsTooManyRequests(r) {
 						sleepTime := time.Duration(float64(rand.Intn(500)+500) * backoff)
 						time.Sleep(sleepTime * time.Millisecond)
-						fmt.Println("Rate limit error. Sleeping for", sleepTime, "ms")
+						logger.Logger.Info("Rate limit error. Delaying further requests.", "delay_ms", sleepTime)
 						// Clear cache file
 						cr.ClearCacheFile(config)
 
@@ -239,8 +239,7 @@ func (j JiraAPI) fetchAdditionalResults(req *http.Request, config *rutil.CacheCo
 
 					// Decode the response body
 					if err := json.NewDecoder(r2).Decode(&data); err != nil {
-						// fmt.Println("Response body:", string(respBodyBytes))
-						fmt.Println("Error parsing JSON from Cache file ", cr.GetCacheFile(config), ":", err)
+						logger.Logger.Error("Error decoding JSON from response body", "error", err)
 						results <- nil
 						return
 					}
@@ -271,7 +270,7 @@ func buildSearchRequest(url string, secrets secrets.Secrets, jql string, maxResu
 		return nil, fmt.Errorf("error preparing GET request: %v", err)
 	}
 
-	fmt.Println("JQL:", jql)
+	logger.Logger.Info("JQL Query", "query", jql)
 
 	q := req.URL.Query()
 	q.Set("jql", jql)
