@@ -18,8 +18,8 @@ func init() {
 	} else {
 		Logger.SetFormatter(log.JSONFormatter)
 		Logger.SetLevel(log.InfoLevel)
-		Logger.SetReportTimestamp(true) // or false, depending on your needs
-		Logger.SetReportCaller(false)   // Generally, caller info is less
+		Logger.SetReportTimestamp(false) // or false, depending on your needs
+		Logger.SetReportCaller(false)    // Generally, caller info is less
 	}
 
 }
