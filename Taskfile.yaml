@@ -28,11 +28,6 @@ tasks:
       - rm -rf dist
       - rm -rf cache
 
-  decrypt:
-    desc: "Decrypt secrets"
-    cmds:
-      - sops -d enc.env > .env
-
   update:
     desc: "Update dependencies"
     cmds:

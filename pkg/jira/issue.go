@@ -198,10 +198,6 @@ func IssueFromInterface(i interface{}) (issue Issue, err error) {
 func extractDescription(i map[string]interface{}) string {
 	var out string
 
-	// // Pretty print the i map
-	// b, _ := json.MarshalIndent(i, "", "  ")
-	// fmt.Println(string(b))
-
 	// If the type is a doc, then extract the content
 	if i["type"] == "doc" {
 		if content, ok := i["content"].([]interface{}); ok {
