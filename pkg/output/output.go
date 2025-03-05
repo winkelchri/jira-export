@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 )
 
+// StoreJSON stores the JSON response in a file
 func StoreJSON(reader io.ReadCloser, filename string) error {
 	// Extract the parent directory from the filename
 	dir := filepath.Dir(filename)
@@ -39,6 +40,7 @@ func StoreJSON(reader io.ReadCloser, filename string) error {
 	return nil
 }
 
+// WriteToFile writes the JSON data to a file
 func WriteToFile(filename string, data string) error {
 	// Create the file
 	file, err := os.Create(filename)
@@ -56,6 +58,7 @@ func WriteToFile(filename string, data string) error {
 	return nil
 }
 
+// ListFiles lists all files in a directory that match a glob pattern
 func ListFiles(dir string, glob string) ([]string, error) {
 	// Get all files in the directory
 	files, err := filepath.Glob(filepath.Join(dir, glob))

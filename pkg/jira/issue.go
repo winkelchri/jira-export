@@ -88,29 +88,39 @@ type Issue struct {
 	Updated                  string        `json:"updated"`
 }
 
-func IssueFromInterface(i interface{}) (issue Issue, err error) {
+func IssueFromInterface(i any) (issue Issue, err error) {
 
 	// Convert the interface to a map
-	issueMap, ok := i.(map[string]interface{})
+	issueMap, ok := i.(map[string]any)
 	if !ok {
 		return issue, fmt.Errorf("error converting raw issue to map")
 	}
 
 	// Extract the "fields" object from the issueMap
-	fieldsMap, ok := issueMap["fields"].(map[string]interface{})
+	fieldsMap, ok := issueMap["fields"].(map[string]any)
 	if !ok {
 		return issue, fmt.Errorf("error converting fields to map")
 	}
 
 	// Set the assignee
-	if assignee, ok := fieldsMap["assignee"].(map[string]interface{}); ok {
+	if assignee, ok := fieldsMap["assignee"].(map[string]any); ok {
 		issue.Assignee.FromInterface(assignee)
 	}
 
+	// Set the Title field
+	if title, ok := fieldsMap["summary"].(string); ok {
+		issue.Title = title
+	}
+
+	// Set the Description field
+	if description, ok := fieldsMap["description"].(map[string]any); ok {
+		issue.Description = extractDescription(description)
+	}
+
 	// Set the components
-	if components, ok := fieldsMap["components"].([]interface{}); ok {
+	if components, ok := fieldsMap["components"].([]any); ok {
 		for _, component := range components {
-			if c, ok := component.(map[string]interface{}); ok {
+			if c, ok := component.(map[string]any); ok {
 				if name, ok := c["name"].(string); ok {
 					issue.Components = append(issue.Components, name)
 				}
@@ -124,13 +134,8 @@ func IssueFromInterface(i interface{}) (issue Issue, err error) {
 	}
 
 	// Set the Creator field
-	if creator, ok := fieldsMap["creator"].(map[string]interface{}); ok {
+	if creator, ok := fieldsMap["creator"].(map[string]any); ok {
 		issue.Creator.FromInterface(creator)
-	}
-
-	// Set the Description field
-	if description, ok := fieldsMap["description"].(map[string]interface{}); ok {
-		issue.Description = extractDescription(description)
 	}
 
 	// Set the ID field
@@ -139,7 +144,7 @@ func IssueFromInterface(i interface{}) (issue Issue, err error) {
 	}
 
 	// Set the IssueType field
-	if issueType, ok := fieldsMap["issuetype"].(map[string]interface{}); ok {
+	if issueType, ok := fieldsMap["issuetype"].(map[string]any); ok {
 		if name, ok := issueType["name"].(string); ok {
 			issue.IssueType = name
 		}
@@ -151,7 +156,7 @@ func IssueFromInterface(i interface{}) (issue Issue, err error) {
 	}
 
 	// Set the Reporter field
-	if reporter, ok := fieldsMap["reporter"].(map[string]interface{}); ok {
+	if reporter, ok := fieldsMap["reporter"].(map[string]any); ok {
 		issue.Reporter.FromInterface(reporter)
 	}
 
@@ -171,7 +176,7 @@ func IssueFromInterface(i interface{}) (issue Issue, err error) {
 	}
 
 	// Set the Status field
-	if status, ok := fieldsMap["status"].(map[string]interface{}); ok {
+	if status, ok := fieldsMap["status"].(map[string]any); ok {
 		if name, ok := status["name"].(string); ok {
 			issue.Status = name
 		}
@@ -182,11 +187,6 @@ func IssueFromInterface(i interface{}) (issue Issue, err error) {
 		issue.StatusCategoryChangeDate = statusCategoryChangeDate
 	}
 
-	// Set the Title field
-	if title, ok := fieldsMap["summary"].(string); ok {
-		issue.Title = title
-	}
-
 	// Set the Updated field
 	if updated, ok := fieldsMap["updated"].(string); ok {
 		issue.Updated = updated
@@ -195,14 +195,14 @@ func IssueFromInterface(i interface{}) (issue Issue, err error) {
 	return issue, nil
 }
 
-func extractDescription(i map[string]interface{}) string {
+func extractDescription(i map[string]any) string {
 	var out string
 
 	// If the type is a doc, then extract the content
 	if i["type"] == "doc" {
-		if content, ok := i["content"].([]interface{}); ok {
+		if content, ok := i["content"].([]any); ok {
 			for _, c := range content {
-				if m, ok := c.(map[string]interface{}); ok {
+				if m, ok := c.(map[string]any); ok {
 					out = out + extractDescription(m)
 				}
 			}
@@ -211,17 +211,50 @@ func extractDescription(i map[string]interface{}) string {
 
 	// If the type is a paragraph, then extract the content
 	if i["type"] == "paragraph" {
-		if content, ok := i["content"].([]interface{}); ok {
+		if content, ok := i["content"].([]any); ok {
 			for _, c := range content {
-				if m, ok := c.(map[string]interface{}); ok {
+				if m, ok := c.(map[string]any); ok {
 					out = out + extractDescription(m)
 				}
 			}
 		}
 	}
 
+	// If the type is a table, then extract the content from the cells
+	if i["type"] == "table" {
+		if content, ok := i["content"].([]any); ok {
+			for _, c := range content {
+				if row, ok := c.(map[string]any); ok {
+					out = out + extractDescription(row)
+				}
+			}
+		}
+	}
+
+	// If the type is a tableRow, then extract the content from the cells
+	if i["type"] == "tableRow" {
+		if content, ok := i["content"].([]any); ok {
+			for _, c := range content {
+				if cell, ok := c.(map[string]any); ok {
+					out = out + extractDescription(cell)
+				}
+			}
+		}
+	}
+
+	// If the type is a tableCell, then extract the content from the paragraphs
+	if i["type"] == "tableCell" {
+		if content, ok := i["content"].([]any); ok {
+			for _, c := range content {
+				if paragraph, ok := c.(map[string]any); ok {
+					out = out + extractDescription(paragraph)
+				}
+			}
+		}
+	}
+
 	if i["type"] == "inlineCard" {
-		if attrs, ok := i["attrs"].(map[string]interface{}); ok {
+		if attrs, ok := i["attrs"].(map[string]any); ok {
 			if url, ok := attrs["url"].(string); ok {
 				out = out + "<" + url + ">"
 			}
@@ -229,9 +262,9 @@ func extractDescription(i map[string]interface{}) string {
 	}
 
 	if i["type"] == "bulletList" {
-		if content, ok := i["content"].([]interface{}); ok {
+		if content, ok := i["content"].([]any); ok {
 			for _, c := range content {
-				if m, ok := c.(map[string]interface{}); ok {
+				if m, ok := c.(map[string]any); ok {
 					out = out + extractDescription(m)
 				}
 			}
@@ -239,9 +272,9 @@ func extractDescription(i map[string]interface{}) string {
 	}
 
 	if i["type"] == "listItem" {
-		if content, ok := i["content"].([]interface{}); ok {
+		if content, ok := i["content"].([]any); ok {
 			for _, c := range content {
-				if m, ok := c.(map[string]interface{}); ok {
+				if m, ok := c.(map[string]any); ok {
 					out = out + " * " + extractDescription(m) + "\n"
 				}
 			}
@@ -251,7 +284,11 @@ func extractDescription(i map[string]interface{}) string {
 	// If the type is a text, then extract the text
 	if i["type"] == "text" {
 		if text, ok := i["text"].(string); ok {
-			out = text
+			if strings.Contains("Termination", text) {
+				fmt.Println("Termination")
+			}
+
+			out = strings.TrimSpace(text)
 		}
 	}
 
@@ -265,8 +302,8 @@ type JiraIssueUser struct {
 	EmailAddress string `json:"emailAddress,omitempty"`
 }
 
-func (j *JiraIssueUser) FromInterface(i interface{}) error {
-	m, ok := i.(map[string]interface{})
+func (j *JiraIssueUser) FromInterface(i any) error {
+	m, ok := i.(map[string]any)
 	if !ok {
 		return fmt.Errorf("error converting to map")
 	}
